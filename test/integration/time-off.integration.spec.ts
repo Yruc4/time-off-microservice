@@ -256,4 +256,124 @@ describe('TimeOffService — integration (real SQLite, mock HCM)', () => {
       }),
     ).rejects.toThrow(); // insufficient
   });
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Work anniversary / external HCM balance increase
+  // ────────────────────────────────────────────────────────────────────────────
+
+  it('work anniversary: HCM balance increased externally → reconcile syncs local → employee can request more', async () => {
+    // Initial state: employee has 2 days
+    hcm.seedBalance(EMP, LOC, 2);
+    await reconciliationService.reconcileFromHcm();
+
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(2);
+
+    // Employee requests 2 days — uses the full balance
+    await timeOffService.requestTimeOff({
+      request_id: 'anniversary-pre-01',
+      employee_id: EMP,
+      location_id: LOC,
+      days_requested: 2,
+    });
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(0);
+
+    // Work anniversary fires in HCM: balance boosted to 10 (external system change)
+    hcm.seedBalance(EMP, LOC, 10);
+
+    // Before reconcile: local still shows 0, request would be rejected
+    await expect(
+      timeOffService.requestTimeOff({
+        request_id: 'anniversary-pre-block',
+        employee_id: EMP,
+        location_id: LOC,
+        days_requested: 5,
+      }),
+    ).rejects.toThrow(/insufficient/i);
+
+    // Reconcile pulls fresh data from HCM — local balance now reflects the bonus
+    const result = await reconciliationService.reconcileFromHcm();
+    expect(result.updated).toBe(1);
+
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(10);
+
+    // Employee can now request days again after the anniversary bonus
+    const req = await timeOffService.requestTimeOff({
+      request_id: 'anniversary-post-01',
+      employee_id: EMP,
+      location_id: LOC,
+      days_requested: 5,
+    });
+    expect(req.status).toBe(TimeOffRequestStatus.APPROVED);
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(5);
+  });
+
+  it('work anniversary via push-reconcile (HCM sends payload): local balance updates correctly', async () => {
+    // Start with 3 days, deplete fully
+    hcm.seedBalance(EMP, LOC, 3);
+    await reconciliationService.reconcileFromHcm();
+
+    await timeOffService.requestTimeOff({
+      request_id: 'anniversary-push-pre',
+      employee_id: EMP,
+      location_id: LOC,
+      days_requested: 3,
+    });
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(0);
+
+    // HCM pushes an updated corpus (simulating the batch endpoint used after anniversaries).
+    // The payload IS the new HCM state, so we also update the mock HCM store to match.
+    hcm.seedBalance(EMP, LOC, 15);
+    const pushResult = await reconciliationService.reconcileFromPayload({
+      balances: [{ employee_id: EMP, location_id: LOC, balance: 15 }],
+    });
+    expect(pushResult.updated).toBe(1);
+
+    // Local balance now reflects the HCM-pushed anniversary bonus
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(15);
+
+    // Employee can now book time off
+    const req = await timeOffService.requestTimeOff({
+      request_id: 'anniversary-push-post',
+      employee_id: EMP,
+      location_id: LOC,
+      days_requested: 8,
+    });
+    expect(req.status).toBe(TimeOffRequestStatus.APPROVED);
+    expect((await timeOffService.getBalance(EMP, LOC)).balance).toBe(7);
+  });
+
+  it('year-start balance reset: multiple employees receive new allocation simultaneously', async () => {
+    const employees = [
+      { employee_id: 'emp-year-01', location_id: 'loc-nyc' },
+      { employee_id: 'emp-year-02', location_id: 'loc-nyc' },
+      { employee_id: 'emp-year-03', location_id: 'loc-sf' },
+    ];
+
+    // Seed initial balances and reconcile
+    for (const { employee_id, location_id } of employees) {
+      hcm.seedBalance(employee_id, location_id, 5);
+    }
+    await reconciliationService.reconcileFromHcm();
+
+    // Year-start: HCM pushes full reset (all employees get 20 days)
+    const yearStartPayload = employees.map(({ employee_id, location_id }) => ({
+      employee_id,
+      location_id,
+      balance: 20,
+    }));
+
+    const resetResult = await reconciliationService.reconcileFromPayload({
+      balances: yearStartPayload,
+    });
+
+    expect(resetResult.processed).toBe(3);
+    expect(resetResult.updated).toBe(3);
+    expect(resetResult.created).toBe(0);
+
+    // All employees now have 20 days
+    for (const { employee_id, location_id } of employees) {
+      const bal = await timeOffService.getBalance(employee_id, location_id);
+      expect(bal.balance).toBe(20);
+    }
+  });
 });
