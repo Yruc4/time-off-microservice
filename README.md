@@ -2,7 +2,7 @@
 
 High-reliability Node.js microservice (NestJS + TypeScript) that manages employee time-off requests while keeping a local SQLite cache synchronized with an external HCM (Human Capital Management) system — the authoritative source of truth.
 
-> **Language note:** The solution is written in TypeScript, which is a typed superset of JavaScript that compiles 1-to-1 to plain JavaScript. The compiled output lives in `dist/` and is runnable with Node.js without any TypeScript tooling.
+> **Language note:** The solution is written in TypeScript, a typed superset of JavaScript. The compiled output in `dist/` runs on plain Node.js without any TypeScript tooling.
 
 ---
 
@@ -10,8 +10,8 @@ High-reliability Node.js microservice (NestJS + TypeScript) that manages employe
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
+- **Node.js 18+**
+- **npm 9+**
 
 ### Install & run
 
@@ -26,24 +26,37 @@ npm run start:dev
 npm run build && npm start
 ```
 
-The server starts on `http://localhost:3000`.
+The server starts on **http://localhost:3000**.
+
+> If port 3000 is already in use, stop the conflicting process or set the `PORT` environment variable before starting.
 
 ---
 
 ## Running Tests
 
 ```bash
-# All tests (unit + integration + concurrency) — recommended
+# Full suite — all 53 tests across 6 suites (recommended)
 npm test
 
-# Individually
-npm run test:unit          # Mocked dependencies, fast
-npm run test:int           # Real in-memory SQLite, mock HCM
-npm run test:concurrency   # Race-condition invariant checks
-npm run test:cov           # Coverage report
+# With coverage report (opens HTML in coverage/lcov-report/index.html)
+npm run test:cov
+
+# Individual suites
+npm run test:unit          # Unit tests — mocked dependencies, fast
+npm run test:int           # Integration — real in-memory SQLite, mock HCM
+npm run test:concurrency   # Concurrency — race-condition invariant checks
 ```
 
-All 22 tests pass out of the box.
+All **53 tests** pass out of the box across 6 suites:
+
+| Suite | Tests | What it covers |
+|---|---|---|
+| `test/unit/time-off.service.spec.ts` | 12 | Service logic with mocked repos and HCM |
+| `test/unit/global-exception-filter.spec.ts` | 10 | Error-code → HTTP status mapping |
+| `test/integration/time-off.integration.spec.ts` | 13 | Full stack with real SQLite, including work anniversary scenarios |
+| `test/concurrency/time-off.concurrency.spec.ts` | 4 | Concurrent requests, optimistic lock, race safety |
+| `test/e2e/time-off.e2e.spec.ts` | 8 | HTTP server via supertest — all routes, validation, routing |
+| `test/e2e/hcm-real-http.spec.ts` | 6 | Real TCP socket to standalone mock HCM HTTP server |
 
 ---
 
@@ -110,7 +123,7 @@ src/
 │   ├── entities/          # TypeORM entities (EmployeeBalance, TimeOffRequest)
 │   └── interfaces/        # HCM proxy contract
 ├── modules/
-│   ├── hcm-proxy/         # HcmProxyService + MockHcmService
+│   ├── hcm-proxy/         # HcmProxyService, MockHcmService, HcmHttpService
 │   └── time-off/          # TimeOffService, ReconciliationService, Controller
 ├── common/
 │   ├── dto/               # Request validation DTOs (class-validator)
@@ -121,8 +134,12 @@ docs/
 └── TRD.md                 # Full technical design document
 test/
 ├── unit/                  # Mocked dependencies
-├── integration/           # Real SQLite, mock HCM
-└── concurrency/           # Parallel-request invariant tests
+├── integration/           # Real SQLite, in-process mock HCM
+├── concurrency/           # Parallel-request invariant tests
+└── e2e/
+    ├── time-off.e2e.spec.ts       # Supertest against real HTTP server
+    ├── hcm-real-http.spec.ts      # Tests over real TCP to standalone HCM mock
+    └── mock-hcm-server.ts         # Standalone Node.js HTTP mock HCM server
 ```
 
 ---
