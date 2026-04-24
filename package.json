@@ -4,7 +4,7 @@
   "description": "High-reliability Time-Off Microservice synchronized with HCM (Source of Truth)",
   "scripts": {
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "node dist/src/main.js",
     "start:dev": "nest start --watch",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",

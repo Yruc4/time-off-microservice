@@ -1,2 +1,6 @@
 node_modules/
+dist/
+coverage/
+time_off.db
 .env
+
