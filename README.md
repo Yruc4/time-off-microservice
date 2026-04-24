@@ -1,5 +1,7 @@
 # Time-Off Microservice
 
+**GitHub Repository:** https://github.com/Yruc4/time-off-microservice
+
 High-reliability Node.js microservice (NestJS + TypeScript) that manages employee time-off requests while keeping a local SQLite cache synchronized with an external HCM (Human Capital Management) system — the authoritative source of truth.
 
 > **Language note:** The solution is written in TypeScript, a typed superset of JavaScript. The compiled output in `dist/` runs on plain Node.js without any TypeScript tooling.
