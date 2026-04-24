@@ -8,7 +8,7 @@
     "start:dev": "nest start --watch",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage --runInBand",
+    "test:cov": "jest --coverage --runInBand --forceExit",
     "test:unit": "jest --testPathPattern=unit --runInBand",
     "test:int": "jest --testPathPattern=integration --runInBand",
     "test:concurrency": "jest --testPathPattern=concurrency --runInBand"

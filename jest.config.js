@@ -11,4 +11,13 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src/', '<rootDir>/test/'],
   testTimeout: 30000,
+  reporters: [
+    'default',
+    ['jest-html-reporters', {
+      publicPath: './coverage',
+      filename: 'test-report.html',
+      openReport: true,
+      pageTitle: 'Time-Off Microservice — Test Report',
+    }],
+  ],
 };
